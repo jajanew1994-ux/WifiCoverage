@@ -20,6 +20,8 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.cachemanager.CacheManager
+import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Polygon
@@ -31,10 +33,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var wifi: WifiManager
     private lateinit var tvStatus: TextView
     private lateinit var btnToggle: Button
+    private lateinit var btnSave: Button
 
     private val rssiWindow = ArrayDeque<Int>()
     private var lastPoint: Location? = null
     private var running = false
+    private var centered = false
 
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -56,25 +60,56 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        Configuration.getInstance().load(
-            applicationContext,
-            getSharedPreferences("osm", Context.MODE_PRIVATE)
-        )
-        Configuration.getInstance().userAgentValue = "WifiCoverageApp/1.0 (github.com/jajanew1994-ux/WifiCoverage)"
+        val cfg = Configuration.getInstance()
+        cfg.load(applicationContext, getSharedPreferences("osm", Context.MODE_PRIVATE))
+        cfg.userAgentValue = "WifiCoverageApp/1.0 (github.com/jajanew1994-ux/WifiCoverage)"
+        cfg.tileFileSystemCacheMaxBytes = 1_000_000_000L
+        cfg.tileFileSystemCacheTrimBytes = 800_000_000L
+
         setContentView(R.layout.activity_main)
 
         fused = LocationServices.getFusedLocationProviderClient(this)
         wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         tvStatus = findViewById(R.id.tvStatus)
         btnToggle = findViewById(R.id.btnToggle)
+        btnSave = findViewById(R.id.btnSave)
+
+        val carto = XYTileSource(
+            "CartoVoyager", 0, 20, 256, ".png",
+            arrayOf(
+                "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
+                "https://b.basemaps.cartocdn.com/rastertiles/voyager/"
+            ),
+            "© OpenStreetMap contributors © CARTO"
+        )
 
         mapView = findViewById(R.id.map)
+        mapView.setTileSource(carto)
         mapView.setMultiTouchControls(true)
-        mapView.controller.setZoom(19.0)
+        mapView.controller.setZoom(18.0)
 
         btnToggle.setOnClickListener {
             if (running) stopTracking() else requestPermsAndStart()
         }
+        btnSave.setOnClickListener { saveAreaOffline() }
+    }
+
+    private fun saveAreaOffline() {
+        Toast.makeText(this, "Saving visible map area...", Toast.LENGTH_SHORT).show()
+        CacheManager(mapView).downloadAreaAsync(
+            this, mapView.boundingBox, 16, 19,
+            object : CacheManager.CacheManagerCallback {
+                override fun onTaskComplete() {
+                    Toast.makeText(this@MainActivity, "Area saved for offline use", Toast.LENGTH_LONG).show()
+                }
+                override fun onTaskFailed(errors: Int) {
+                    Toast.makeText(this@MainActivity, "Save failed. Check your internet", Toast.LENGTH_LONG).show()
+                }
+                override fun updateProgress(progress: Int, currentZoomLevel: Int, zoomMin: Int, zoomMax: Int) {}
+                override fun downloadStarted() {}
+                override fun setPossibleTilesInArea(total: Int) {}
+            }
+        )
     }
 
     private fun requestPermsAndStart() {
@@ -101,9 +136,15 @@ class MainActivity : AppCompatActivity() {
 
     @Suppress("DEPRECATION")
     private fun handleReading(loc: Location) {
+        val here = GeoPoint(loc.latitude, loc.longitude)
+        if (!centered) {
+            mapView.controller.animateTo(here)
+            centered = true
+        }
+
         val info = wifi.connectionInfo
         if (info == null || info.networkId == -1) {
-            tvStatus.text = "Not connected to WiFi"
+            tvStatus.text = "Not connected to WiFi (map still tracking)"
             return
         }
 
@@ -117,7 +158,6 @@ class MainActivity : AppCompatActivity() {
         val prev = lastPoint
         if (prev == null || loc.distanceTo(prev) >= 1.5f) {
             lastPoint = loc
-            val here = GeoPoint(loc.latitude, loc.longitude)
 
             val dot = Polygon(mapView).apply {
                 points = Polygon.pointsAsCircle(here, 2.0)
@@ -125,8 +165,6 @@ class MainActivity : AppCompatActivity() {
                 outlinePaint.strokeWidth = 0f
             }
             mapView.overlays.add(dot)
-
-            if (prev == null) mapView.controller.animateTo(here)
             mapView.invalidate()
         }
     }
