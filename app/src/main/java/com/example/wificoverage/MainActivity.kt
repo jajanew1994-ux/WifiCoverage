@@ -60,8 +60,7 @@ class MainActivity : AppCompatActivity() {
             applicationContext,
             getSharedPreferences("osm", Context.MODE_PRIVATE)
         )
-        Configuration.getInstance().userAgentValue = packageName
-
+        Configuration.getInstance().userAgentValue = "WifiCoverageApp/1.0 (github.com/jajanew1994-ux/WifiCoverage)"
         setContentView(R.layout.activity_main)
 
         fused = LocationServices.getFusedLocationProviderClient(this)
