@@ -21,7 +21,8 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.cachemanager.CacheManager
-import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Polygon
