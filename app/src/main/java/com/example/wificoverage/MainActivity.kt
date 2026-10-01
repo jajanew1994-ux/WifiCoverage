@@ -75,15 +75,17 @@ class MainActivity : AppCompatActivity() {
         btnToggle = findViewById(R.id.btnToggle)
         btnSave = findViewById(R.id.btnSave)
 
-        val carto = XYTileSource(
-            "CartoVoyager", 0, 20, 256, ".png",
-            arrayOf(
-                "https://a.basemaps.cartocdn.com/rastertiles/voyager/",
-                "https://b.basemaps.cartocdn.com/rastertiles/voyager/"
-            ),
-            "© OpenStreetMap contributors © CARTO"
-        )
-
+        val carto = object : OnlineTileSourceBase(
+    "EsriStreet", 0, 19, 256, "",
+    arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/"),
+    "Tiles © Esri"
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        return baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" +
+            MapTileIndex.getY(pMapTileIndex) + "/" +
+            MapTileIndex.getX(pMapTileIndex)
+    }
+        }
         mapView = findViewById(R.id.map)
         mapView.setTileSource(carto)
         mapView.setMultiTouchControls(true)
